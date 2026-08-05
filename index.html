@@ -146,10 +146,36 @@ tr.wknd .daycol{background:linear-gradient(90deg,var(--goldbg),var(--surface))}
 .dark #tip{background:#000}
 .foot{color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.6}
 @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.socards{grid-template-columns:1fr}}
+/* login gate */
+#gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);padding:20px}
+#gate.hidden{display:none}
+.gatebox{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+  padding:32px 28px;width:100%;max-width:360px;text-align:center}
+.gatebox h2{margin:0 0 4px;font-size:18px;color:var(--ink);letter-spacing:-.01em}
+.gatebox p{margin:0 0 20px;font-size:12.5px;color:var(--muted);line-height:1.5}
+.gatebox input{width:100%;padding:12px 14px;font-size:15px;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg);color:var(--ink);outline:none}
+.gatebox input:focus{border-color:var(--brand2)}
+.gatebox button{width:100%;margin-top:12px;padding:12px;font-size:14px;font-weight:600;border:0;border-radius:10px;
+  background:var(--brand);color:#fff;cursor:pointer}
+.gatebox button:hover{background:var(--brand2)}
+.gateerr{color:#c0392b;font-size:12.5px;margin-top:12px;display:none}
+.wrap.locked{filter:blur(6px);pointer-events:none;user-select:none}
 </style>
 </head>
 <body data-palette="#2f6b4f,#c8952a">
-<div class="wrap">
+<div id="gate">
+  <div class="gatebox">
+    <h2>Nature Link Resorts</h2>
+    <p>Revenue Management Baseline<br>Enter the password to continue.</p>
+    <input type="password" id="gatepw" placeholder="Password" autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Sign In</button>
+    <div class="gateerr" id="gateerr">Wrong password. Try again.</div>
+  </div>
+</div>
+<div class="wrap locked">
 <header>
   <div>
     <h1>Nature Link Resorts · Revenue Management Baseline</h1>
@@ -235,7 +261,7 @@ tr.wknd .daycol{background:linear-gradient(90deg,var(--goldbg),var(--surface))}
     <button class="addbtn" id="addnote">+ Add note</button>
   </div>
   <div id="notes"></div>
-  <div class="notehint">Your notes are saved in this browser when you open the file locally. To share a fixed snapshot, send the file as-is.</div>
+  <div class="notehint">Your notes are saved to the cloud and stay in sync across every device you sign in on.</div>
 </section>
 
 <div class="foot" id="method"></div>
@@ -453,10 +479,41 @@ const NOTE_SEED=[
   {t:'$20 guest-code credit for wedding couples',x:'Give each couple a unique booking code. For every room booked with it, credit the couple $20 toward their own wedding-weekend stay or a future honeymoon. Turns couples into a distribution channel and rewards them for filling their block.',g:2},
   {t:'Revenue left on the table: 71 unsold wedding nights',x:'The 71 wedding nights that did not sell out left 431 rooms empty — about 6 per night. At the blended $374 ADR, filling every one of those rooms would have added ~$161,000 in room revenue (a +8.8% lift on the year). Converting even half — roughly 35 of those nights taken to a full 25/25 — is worth ~$81,000 (+4.4%). The guests were already on property for a wedding; this is the direct dollar case for single-night stays. (Conservative: uses blended ADR; wedding-weekend rates typically run higher.)',g:1}
 ];
+let authToken=sessionStorage.getItem('rm-token')||'';
+function authHeaders(extra){const h=extra||{}; if(authToken) h['Authorization']='Bearer '+authToken; return h;}
 let notes=null;
 try{notes=JSON.parse(localStorage.getItem('nl_notes'));}catch(e){}
 if(!Array.isArray(notes)||!notes.length) notes=NOTE_SEED.map(s=>({...s}));
-function saveNotes(){try{localStorage.setItem('nl_notes',JSON.stringify(notes));}catch(e){}}
+let saveTimer=null;
+// Cache locally for instant loads, then push to shared cloud storage so every
+// device that logs in stays in sync. The save is debounced so quick edits
+// only send one request.
+function saveNotes(){
+  try{localStorage.setItem('nl_notes',JSON.stringify(notes));}catch(e){}
+  if(!authToken) return;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    fetch('/api/notes',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),
+      body:JSON.stringify({notes})}).catch(()=>{});
+  },500);
+}
+// Pull the shared notes after login. If the cloud is empty (first run), seed
+// it with what we have so the other devices pick up the same starting list.
+async function loadNotes(){
+  if(!authToken) return;
+  try{
+    const res=await fetch('/api/notes',{headers:authHeaders()});
+    if(!res.ok) return;
+    const data=await res.json();
+    if(data&&Array.isArray(data.notes)&&data.notes.length){
+      notes=data.notes;
+      try{localStorage.setItem('nl_notes',JSON.stringify(notes));}catch(e){}
+      renderNotes();
+    }else{
+      saveNotes();
+    }
+  }catch(e){}
+}
 let dragIdx=null;
 function renderNotes(){
   const box=$('#notes'); box.innerHTML='';
@@ -509,6 +566,37 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 $('#mode').onclick=()=>{document.body.classList.toggle('dark');
   $('#mode').textContent=document.body.classList.contains('dark')?'◐ Light':'◐ Dark';};
+
+/* ---------- login gate ---------- */
+function unlock(){
+  document.getElementById('gate').classList.add('hidden');
+  document.querySelector('.wrap').classList.remove('locked');
+  loadNotes();
+}
+async function doLogin(){
+  const pw=document.getElementById('gatepw').value;
+  const err=document.getElementById('gateerr');
+  err.style.display='none';
+  try{
+    const res=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({password:pw})});
+    if(!res.ok){err.style.display='block';return;}
+    const {token}=await res.json();
+    authToken=token; sessionStorage.setItem('rm-token',token);
+    unlock();
+  }catch(e){err.style.display='block';}
+}
+// If we already hold a valid token this session, skip the login screen.
+(async()=>{
+  if(authToken){
+    try{
+      const res=await fetch('/api/auth',{headers:{'Authorization':'Bearer '+authToken}});
+      if(res.ok){unlock();return;}
+    }catch(e){}
+    sessionStorage.removeItem('rm-token'); authToken='';
+  }
+  const pw=document.getElementById('gatepw'); if(pw) pw.focus();
+})();
 </script>
 </body>
 </html>
