@@ -36,7 +36,10 @@ export default async function handler(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const notes = Array.isArray(body.notes) ? body.notes : [];
-      await put(BLOB_PATH, JSON.stringify({ notes }), {
+      // `seeded` tracks one-time note injections already applied to this shared
+      // list, so they aren't re-added on the next device that loads.
+      const seeded = Array.isArray(body.seeded) ? body.seeded : [];
+      await put(BLOB_PATH, JSON.stringify({ notes, seeded }), {
         access: 'private',
         contentType: 'application/json',
         addRandomSuffix: false,
