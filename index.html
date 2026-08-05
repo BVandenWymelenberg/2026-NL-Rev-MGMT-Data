@@ -479,6 +479,21 @@ const NOTE_SEED=[
   {t:'$20 guest-code credit for wedding couples',x:'Give each couple a unique booking code. For every room booked with it, credit the couple $20 toward their own wedding-weekend stay or a future honeymoon. Turns couples into a distribution channel and rewards them for filling their block.',g:2},
   {t:'Revenue left on the table: 71 unsold wedding nights',x:'The 71 wedding nights that did not sell out left 431 rooms empty — about 6 per night. At the blended $374 ADR, filling every one of those rooms would have added ~$161,000 in room revenue (a +8.8% lift on the year). Converting even half — roughly 35 of those nights taken to a full 25/25 — is worth ~$81,000 (+4.4%). The guests were already on property for a wedding; this is the direct dollar case for single-night stays. (Conservative: uses blended ADR; wedding-weekend rates typically run higher.)',g:1}
 ];
+// One-time notes to fold into the shared list (applied once, then tracked in
+// the cloud via `seeded` so they never double-add across devices).
+const NOTE_INJECT=[
+  {k:'top5-single-night',g:0,t:'Top 5 · #1 — Single-night stays on every wedding night (lead with May & June)',
+   x:"Wedding nights already run 81.5% full (20.4/25) but leak ~4.6 rooms each — guests our minimum-stay pushes to competitors. Opening single-night stays captures them, and displacement risk is low because non-wedding occupancy is only 44%. Pair it with a comp-night incentive (1 free night per 10–20 guest room-nights booked), a booking link/QR on the couple's wedding site, and a reminder email 4–6 weeks out to drive block pickup to 80–90%. Projected +$110K–$140K/yr — about half of it from May (16 weddings, 0 sold out, 166 empty rooms) and June."},
+  {k:'top5-dynamic-pricing',g:0,t:'Top 5 · #2 — Put dynamic pricing behind peak dates',
+   x:"At 54% occupancy our static rates likely underprice our strongest dates (Jul/Aug, Fri/Sat, wedding nights). Small-property revenue tools (PriceLabs, RoomPriceGenie, Wheelhouse) show +20–25% ADR in case studies. Even a conservative +5% blended ADR ≈ +$90K/yr with no extra guests. Raise rate in summer; add value (not discounts) in winter."},
+  {k:'top5-premium-units',g:2,t:'Top 5 · #3 — Yield the premium units (Aspen & Redwood are underworked)',
+   x:"Aspen earns a $1,154 ADR but sits at only 50% occupancy — lifting it to 70% is +$83K/yr from one cabin. Redwood: $599 ADR at 43%. Market them as the flagship 'anchor' tier and price aggressively; a sold-out standard tier pushes demand up the ladder. Cypress King/Queen ($265–276 ADR) are the laggards — candidates for a refresh or repositioning."},
+  {k:'top5-groups-buyouts',g:0,t:'Top 5 · #4 — Fill midweek & winter with group/buyout business',
+   x:"Our soft spots — midweek (Sun/Mon/Wed ~40%) and winter (Nov–Mar ~40%) — are exactly where corporate retreats and full-property buyouts land (~99% of retreat bookings are weekdays, and a 25-unit buyout is realistic). Set a midweek/off-season buyout rate and list on TeamOut and Retreats and Venues. This is our second source of sell-out nights beyond weddings."},
+  {k:'top5-close-the-last-room',g:2,t:'Top 5 · #5 — Turn "should sell out" into "did sell out"',
+   x:"Cheap, immediate wins: CRM-email past summer guests about specific soft winter/midweek dates (repeat guests spend ~67% more); auto-fill orphan 1-night gaps by dropping the minimum for that night only; set a length-of-stay incentive at 4+ nights to bridge Sun–Wed without cutting rate; and use ~1 unit of disciplined overbooking plus a waitlist to close the final room on high-confidence nights."}
+];
+let seededKeys=[];
 let authToken=sessionStorage.getItem('rm-token')||'';
 function authHeaders(extra){const h=extra||{}; if(authToken) h['Authorization']='Bearer '+authToken; return h;}
 let notes=null;
@@ -494,7 +509,7 @@ function saveNotes(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{
     fetch('/api/notes',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),
-      body:JSON.stringify({notes})}).catch(()=>{});
+      body:JSON.stringify({notes,seeded:seededKeys})}).catch(()=>{});
   },500);
 }
 // Pull the shared notes after login. If the cloud is empty (first run), seed
@@ -507,11 +522,22 @@ async function loadNotes(){
     const data=await res.json();
     if(data&&Array.isArray(data.notes)&&data.notes.length){
       notes=data.notes;
-      try{localStorage.setItem('nl_notes',JSON.stringify(notes));}catch(e){}
-      renderNotes();
+      seededKeys=Array.isArray(data.seeded)?data.seeded:[];
     }else{
-      saveNotes();
+      seededKeys=[];
     }
+    // Fold in any one-time injected notes not yet applied to this shared list.
+    let changed=false;
+    NOTE_INJECT.forEach(n=>{
+      if(!seededKeys.includes(n.k)){
+        notes.push({t:n.t,x:n.x,g:n.g});
+        seededKeys.push(n.k);
+        changed=true;
+      }
+    });
+    try{localStorage.setItem('nl_notes',JSON.stringify(notes));}catch(e){}
+    renderNotes();
+    if(changed) saveNotes();
   }catch(e){}
 }
 let dragIdx=null;
