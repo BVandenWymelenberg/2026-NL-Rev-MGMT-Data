@@ -313,8 +313,8 @@ tr.wknd .daycol{background:linear-gradient(90deg,var(--goldbg),var(--surface))}
   <div class="foot" id="losfoot"></div>
 
   <div class="wedbreak">
-    <h4>💍 Wedding stays only</h4>
-    <div class="sub">Length of stay for guests booked as part of a wedding — a wedding room-block or a wedding rate code — on the nights weddings were held.</div>
+    <h4>💍 Stays on wedding nights</h4>
+    <div class="sub">Length of stay for every reservation that stayed on a night a wedding was held — however they booked (wedding block, wedding rate, or a regular / single-night booking).</div>
     <div class="distkpis" id="loswkpis"></div>
     <div class="dist" id="loswchart"></div>
     <div class="foot" id="loswfoot"></div>
@@ -738,27 +738,27 @@ $('#lostoggle').querySelectorAll('.seg').forEach(b=>b.onclick=()=>{
   $('#lostoggle').querySelectorAll('.seg').forEach(x=>x.classList.remove('on'));
   b.classList.add('on'); losView=b.dataset.v; renderLOS();});
 renderLOS();
-// Length of stay — wedding stays only (guests booked as part of a wedding)
+// Length of stay — every checked-out reservation that stayed on a wedding night
 const LOSW={
-  res:329, nights:694, avg:2.11,
+  res:1376, nights:2727, avg:1.98,
   buckets:[
-    {label:'1 night',  res:5,   nights:5},
-    {label:'2 nights', res:289, nights:578},
-    {label:'3 nights', res:31,  nights:93},
-    {label:'4 nights', res:2,   nights:8},
-    {label:'5 nights', res:2,   nights:10},
+    {label:'1 night',  res:299, nights:299},
+    {label:'2 nights', res:851, nights:1702},
+    {label:'3 nights', res:191, nights:573},
+    {label:'4 nights', res:27,  nights:108},
+    {label:'5 nights', res:6,   nights:30},
     {label:'6 nights', res:0,   nights:0},
-    {label:'7 nights', res:0,   nights:0},
-    {label:'8+ nights',res:0,   nights:0}
+    {label:'7 nights', res:1,   nights:7},
+    {label:'8+ nights',res:1,   nights:8}
   ]
 };
 kpiCards('#loswkpis',[
-  {v:LOSW.avg+' nights', l:'average wedding stay'},
-  {v:'87.8%', l:'stayed exactly 2 nights'},
-  {v:'1.5%', l:'stayed just 1 night'},
-  {v:LOSW.res.toLocaleString(), l:'wedding reservations'}
+  {v:LOSW.avg+' nights', l:'average stay on wedding nights'},
+  {v:'61.8%', l:'stayed 2 nights (851 reservations)'},
+  {v:'21.7%', l:'stayed just 1 night (299 reservations)'},
+  {v:LOSW.res.toLocaleString(), l:'reservations on wedding nights'}
 ]);
-$('#loswfoot').innerHTML='Guests booked as part of a wedding — a wedding room-block or WEDDING15/WED rate code, checked-out — '+LOSW.res.toLocaleString()+' reservations, '+LOSW.nights.toLocaleString()+' room-nights, avg '+LOSW.avg+' nights. Nearly all stay exactly 2 nights under the current wedding-weekend minimum; 1-night stays are rare (1.5%), which is the demand the single-night play targets. Source: ReservationAgentProductivity PMS export (7/1/2025–6/30/2026).';
+$('#loswfoot').innerHTML='Every checked-out reservation that stayed on at least one wedding night, however they booked — '+LOSW.res.toLocaleString()+' reservations, '+LOSW.nights.toLocaleString()+' room-nights, avg '+LOSW.avg+' nights. Single-night stays (299) are 21.7% of the total, and 263 of them booked within 90 days of arrival — mostly at Rack/standard rates, not the wedding block. Source: ReservationAgentProductivity PMS export (7/1/2025–6/30/2026).';
 drawDist('#loswchart', LOSW.buckets, 'res', LOSW.res, 'wed');
 
 /* ---------- login gate ---------- */
