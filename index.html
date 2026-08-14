@@ -183,6 +183,10 @@ tr.wknd .daycol{background:linear-gradient(90deg,var(--goldbg),var(--surface))}
 .dval{color:var(--muted);font-size:12px}
 .dval b{color:var(--ink);font-size:13px}
 @media(max-width:640px){.distkpis{grid-template-columns:repeat(2,1fr)}.drow{grid-template-columns:80px 1fr;grid-template-rows:auto auto}.dval{grid-column:2}}
+.wedbreak{margin-top:34px;padding-top:26px;border-top:1px solid var(--line)}
+.wedbreak h4{margin:0;font-size:14px;color:var(--ink);letter-spacing:-.01em;display:flex;align-items:center;gap:7px}
+.wedbreak .sub{margin-top:4px;margin-bottom:16px;max-width:560px}
+.dfill.wed{background:linear-gradient(90deg,#8a5a9c,#a878b8)}
 </style>
 </head>
 <body data-palette="#2f6b4f,#c8952a">
@@ -307,6 +311,14 @@ tr.wknd .daycol{background:linear-gradient(90deg,var(--goldbg),var(--surface))}
   <div class="distkpis" id="loskpis"></div>
   <div class="dist" id="loschart"></div>
   <div class="foot" id="losfoot"></div>
+
+  <div class="wedbreak">
+    <h4>💍 Wedding stays only</h4>
+    <div class="sub">Length of stay for guests booked as part of a wedding — a wedding room-block or a wedding rate code — on the nights weddings were held.</div>
+    <div class="distkpis" id="loswkpis"></div>
+    <div class="dist" id="loswchart"></div>
+    <div class="foot" id="loswfoot"></div>
+  </div>
 </section>
 
 <section class="panel" id="p-notes">
@@ -682,16 +694,15 @@ const LOS={
     {label:'8+ nights',res:1,    nights:8}
   ]
 };
-function drawDist(elId, buckets, key, total){
+function drawDist(elId, buckets, key, total, peakClass){
   const box=$(elId); box.innerHTML='';
   const max=Math.max(...buckets.map(b=>b[key]));
-  const peak=Math.max(...buckets.map(b=>b[key]));
   buckets.forEach(b=>{
     const v=b[key], p=total?100*v/total:0;
     const row=document.createElement('div'); row.className='drow';
     const unit=key==='nights'?'room-nights':'res';
     row.innerHTML=`<div class="dlabel">${b.label}</div>
-      <div class="dtrack"><div class="dfill${v===peak&&v>0?' peak':''}" style="width:${max?100*v/max:0}%"></div></div>
+      <div class="dtrack"><div class="dfill${v===max&&v>0?' '+(peakClass||'peak'):''}" style="width:${max?100*v/max:0}%"></div></div>
       <div class="dval"><b>${v.toLocaleString()}</b> ${unit} · ${p.toFixed(1)}%</div>`;
     box.appendChild(row);
   });
@@ -727,6 +738,28 @@ $('#lostoggle').querySelectorAll('.seg').forEach(b=>b.onclick=()=>{
   $('#lostoggle').querySelectorAll('.seg').forEach(x=>x.classList.remove('on'));
   b.classList.add('on'); losView=b.dataset.v; renderLOS();});
 renderLOS();
+// Length of stay — wedding stays only (guests booked as part of a wedding)
+const LOSW={
+  res:329, nights:694, avg:2.11,
+  buckets:[
+    {label:'1 night',  res:5,   nights:5},
+    {label:'2 nights', res:289, nights:578},
+    {label:'3 nights', res:31,  nights:93},
+    {label:'4 nights', res:2,   nights:8},
+    {label:'5 nights', res:2,   nights:10},
+    {label:'6 nights', res:0,   nights:0},
+    {label:'7 nights', res:0,   nights:0},
+    {label:'8+ nights',res:0,   nights:0}
+  ]
+};
+kpiCards('#loswkpis',[
+  {v:LOSW.avg+' nights', l:'average wedding stay'},
+  {v:'87.8%', l:'stayed exactly 2 nights'},
+  {v:'1.5%', l:'stayed just 1 night'},
+  {v:LOSW.res.toLocaleString(), l:'wedding reservations'}
+]);
+$('#loswfoot').innerHTML='Guests booked as part of a wedding — a wedding room-block or WEDDING15/WED rate code, checked-out — '+LOSW.res.toLocaleString()+' reservations, '+LOSW.nights.toLocaleString()+' room-nights, avg '+LOSW.avg+' nights. Nearly all stay exactly 2 nights under the current wedding-weekend minimum; 1-night stays are rare (1.5%), which is the demand the single-night play targets. Source: ReservationAgentProductivity PMS export (7/1/2025–6/30/2026).';
+drawDist('#loswchart', LOSW.buckets, 'res', LOSW.res, 'wed');
 
 /* ---------- login gate ---------- */
 function unlock(){
