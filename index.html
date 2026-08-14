@@ -162,6 +162,27 @@ tr.wknd .daycol{background:linear-gradient(90deg,var(--goldbg),var(--surface))}
 .gatebox button:hover{background:var(--brand2)}
 .gateerr{color:#c0392b;font-size:12.5px;margin-top:12px;display:none}
 .wrap.locked{filter:blur(6px);pointer-events:none;user-select:none}
+/* distribution tabs (booking window + length of stay) */
+.disthead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.disthead h3{margin:0;font-size:15px;text-transform:none;letter-spacing:-.01em;color:var(--ink)}
+.disthead .sub{margin-top:4px;max-width:560px}
+.segbtns{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex-shrink:0}
+.seg{background:var(--surface);color:var(--ink2);border:0;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.seg+.seg{border-left:1px solid var(--line)}
+.seg.on{background:var(--brand);color:#fff}
+.distkpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;max-width:840px}
+.dkpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.dkpi .v{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+.dkpi .l{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35}
+.dist{display:flex;flex-direction:column;gap:9px;max-width:840px}
+.drow{display:grid;grid-template-columns:96px 1fr 150px;align-items:center;gap:12px;font-size:13px}
+.dlabel{color:var(--ink2);font-weight:600;text-align:right;white-space:nowrap}
+.dtrack{background:var(--open);border-radius:8px;height:28px;overflow:hidden}
+.dfill{height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:8px;transition:width .45s ease;min-width:2px}
+.dfill.peak{background:linear-gradient(90deg,var(--gold),#e0b054)}
+.dval{color:var(--muted);font-size:12px}
+.dval b{color:var(--ink);font-size:13px}
+@media(max-width:640px){.distkpis{grid-template-columns:repeat(2,1fr)}.drow{grid-template-columns:80px 1fr;grid-template-rows:auto auto}.dval{grid-column:2}}
 </style>
 </head>
 <body data-palette="#2f6b4f,#c8952a">
@@ -190,6 +211,8 @@ tr.wknd .daycol{background:linear-gradient(90deg,var(--goldbg),var(--surface))}
   <div class="tab on" data-t="daily">Daily Grid · 365 days × 25 units</div>
   <div class="tab" data-t="score">Unit Scorecard</div>
   <div class="tab" data-t="sellout">Sell-Out Nights</div>
+  <div class="tab" data-t="window">Booking Window</div>
+  <div class="tab" data-t="los">Length of Stay</div>
   <div class="tab" data-t="notes">Notes &amp; Observations</div>
 </div>
 
@@ -252,6 +275,40 @@ tr.wknd .daycol{background:linear-gradient(90deg,var(--goldbg),var(--surface))}
 </section>
 
 <!-- NOTES -->
+<!-- BOOKING WINDOW -->
+<section class="panel" id="p-window">
+  <div class="disthead">
+    <div>
+      <h3>Booking Window</h3>
+      <div class="sub">How far in advance transient guests booked — lead time from the day a reservation was made to arrival.</div>
+    </div>
+    <div class="segbtns" id="bwtoggle">
+      <button class="seg on" data-v="nights">By room-nights</button>
+      <button class="seg" data-v="res">By reservations</button>
+    </div>
+  </div>
+  <div class="distkpis" id="bwkpis"></div>
+  <div class="dist" id="bwchart"></div>
+  <div class="foot" id="bwfoot"></div>
+</section>
+
+<!-- LENGTH OF STAY -->
+<section class="panel" id="p-los">
+  <div class="disthead">
+    <div>
+      <h3>Length of Stay</h3>
+      <div class="sub">How many consecutive nights each reservation stayed — the count of 1-night, 2-night, 3-night … bookings.</div>
+    </div>
+    <div class="segbtns" id="lostoggle">
+      <button class="seg on" data-v="res">By reservations</button>
+      <button class="seg" data-v="nights">By room-nights</button>
+    </div>
+  </div>
+  <div class="distkpis" id="loskpis"></div>
+  <div class="dist" id="loschart"></div>
+  <div class="foot" id="losfoot"></div>
+</section>
+
 <section class="panel" id="p-notes">
   <div class="notehead">
     <div>
@@ -592,6 +649,84 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 $('#mode').onclick=()=>{document.body.classList.toggle('dark');
   $('#mode').textContent=document.body.classList.contains('dark')?'◐ Light':'◐ Dark';};
+
+/* ---------- BOOKING WINDOW + LENGTH OF STAY ----------
+   Source: ReservationAgentProductivity PMS export, arrivals 7/1/2025–6/30/2026,
+   checked-out (realized) reservations only. Cancelled/no-show excluded.
+   Booking window uses transient (non-group) stays; length of stay uses all. */
+const BW={
+  res:2369, nights:4516, avgLead:104, medianLead:40,
+  within30:44.7, over90:33.9,
+  buckets:[
+    {label:'Same day', res:81,  nights:104},
+    {label:'1–3 days', res:191, nights:306},
+    {label:'4–7 days', res:184, nights:291},
+    {label:'8–14 days', res:238, nights:421},
+    {label:'15–30 days',res:365, nights:683},
+    {label:'31–60 days',res:317, nights:643},
+    {label:'61–90 days',res:190, nights:370},
+    {label:'91–180 days',res:273,nights:556},
+    {label:'180+ days', res:530, nights:1142}
+  ]
+};
+const LOS={
+  res:2562, nights:4921, avg:1.92, oneTwo:82.3,
+  buckets:[
+    {label:'1 night',  res:741,  nights:741},
+    {label:'2 nights', res:1367, nights:2734},
+    {label:'3 nights', res:389,  nights:1167},
+    {label:'4 nights', res:51,   nights:204},
+    {label:'5 nights', res:12,   nights:60},
+    {label:'6 nights', res:0,    nights:0},
+    {label:'7 nights', res:1,    nights:7},
+    {label:'8+ nights',res:1,    nights:8}
+  ]
+};
+function drawDist(elId, buckets, key, total){
+  const box=$(elId); box.innerHTML='';
+  const max=Math.max(...buckets.map(b=>b[key]));
+  const peak=Math.max(...buckets.map(b=>b[key]));
+  buckets.forEach(b=>{
+    const v=b[key], p=total?100*v/total:0;
+    const row=document.createElement('div'); row.className='drow';
+    const unit=key==='nights'?'room-nights':'res';
+    row.innerHTML=`<div class="dlabel">${b.label}</div>
+      <div class="dtrack"><div class="dfill${v===peak&&v>0?' peak':''}" style="width:${max?100*v/max:0}%"></div></div>
+      <div class="dval"><b>${v.toLocaleString()}</b> ${unit} · ${p.toFixed(1)}%</div>`;
+    box.appendChild(row);
+  });
+}
+function kpiCards(elId, cards){
+  $(elId).innerHTML = cards.map(c=>`<div class="dkpi"><div class="v">${c.v}</div><div class="l">${c.l}</div></div>`).join('');
+}
+// Booking window
+kpiCards('#bwkpis',[
+  {v:BW.avgLead+' days', l:'average lead time'},
+  {v:BW.medianLead+' days', l:'median lead time'},
+  {v:BW.within30+'%', l:'booked within 30 days of arrival'},
+  {v:BW.over90+'%', l:'booked 90+ days out'}
+]);
+$('#bwfoot').innerHTML='Transient (non-group) checked-out reservations only — '+BW.res.toLocaleString()+' reservations, '+BW.nights.toLocaleString()+' room-nights. Lead time = arrival date − booking date. Source: ReservationAgentProductivity PMS export (7/1/2025–6/30/2026).';
+let bwView='nights';
+function renderBW(){drawDist('#bwchart', BW.buckets, bwView, bwView==='nights'?BW.nights:BW.res);}
+$('#bwtoggle').querySelectorAll('.seg').forEach(b=>b.onclick=()=>{
+  $('#bwtoggle').querySelectorAll('.seg').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); bwView=b.dataset.v; renderBW();});
+renderBW();
+// Length of stay
+kpiCards('#loskpis',[
+  {v:LOS.avg+' nights', l:'average length of stay'},
+  {v:'2 nights', l:'most common stay (53% of bookings)'},
+  {v:LOS.oneTwo+'%', l:'of stays are 1–2 nights'},
+  {v:LOS.res.toLocaleString(), l:'total reservations'}
+]);
+$('#losfoot').innerHTML='All checked-out overnight reservations — '+LOS.res.toLocaleString()+' reservations, '+LOS.nights.toLocaleString()+' room-nights, avg '+LOS.avg+' nights. Excludes cancellations, no-shows, and 1 day-use (0-night) booking. Source: ReservationAgentProductivity PMS export (7/1/2025–6/30/2026).';
+let losView='res';
+function renderLOS(){drawDist('#loschart', LOS.buckets, losView, losView==='nights'?LOS.nights:LOS.res);}
+$('#lostoggle').querySelectorAll('.seg').forEach(b=>b.onclick=()=>{
+  $('#lostoggle').querySelectorAll('.seg').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); losView=b.dataset.v; renderLOS();});
+renderLOS();
 
 /* ---------- login gate ---------- */
 function unlock(){
